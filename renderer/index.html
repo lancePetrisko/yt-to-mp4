@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src http://localhost:3131" />
+  <title>YT Downloader</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <h1>YT<span>Down</span></h1>
+    <span class="header-subtitle">YouTube → MP4 / MP3</span>
+  </header>
+
+  <!-- Queue -->
+  <main class="queue-container" id="queueContainer">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">⬇</div>
+      <p>No downloads queued. Add a URL to get started.</p>
+    </div>
+    <div id="queueList"></div>
+  </main>
+
+  <!-- Bottom bar -->
+  <footer class="bottom-bar">
+    <div class="folder-section">
+      <span class="folder-label">Save to:</span>
+      <div class="folder-path" id="folderPath">Default (Home folder)</div>
+      <button class="btn btn-ghost" id="btnPickFolder">Browse…</button>
+    </div>
+    <div class="bar-actions">
+      <button class="btn btn-ghost" id="btnAddUrl">+ Add URL</button>
+      <button class="btn btn-primary" id="btnStartAll">▶ Start All</button>
+    </div>
+  </footer>
+
+  <!-- Add URL Modal -->
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal">
+      <h2>Add Download</h2>
+
+      <div class="form-group">
+        <label for="inputUrl">YouTube URL</label>
+        <input
+          class="form-input"
+          type="url"
+          id="inputUrl"
+          placeholder="https://www.youtube.com/watch?v=..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="inputQuality">Quality</label>
+          <select class="form-select" id="inputQuality">
+            <option value="2160p">2160p (4K)</option>
+            <option value="1080p" selected>1080p (FHD)</option>
+            <option value="720p">720p (HD)</option>
+            <option value="480p">480p</option>
+            <option value="360p">360p</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Format</label>
+          <div class="format-toggle">
+            <input type="radio" name="format" id="fmtMp4" value="mp4" checked />
+            <label for="fmtMp4">MP4</label>
+            <input type="radio" name="format" id="fmtMp3" value="mp3" />
+            <label for="fmtMp3">MP3</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnModalCancel">Cancel</button>
+        <button class="btn btn-primary" id="btnModalAdd">Add to Queue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Viewer Modal -->
+  <div class="modal-overlay hidden" id="logOverlay">
+    <div class="modal modal-logs">
+      <div class="log-header">
+        <h2>Download Logs</h2>
+        <button class="btn btn-ghost btn-icon" id="btnLogClose" title="Close">✕</button>
+      </div>
+      <pre class="log-output" id="logOutput">No logs yet.</pre>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

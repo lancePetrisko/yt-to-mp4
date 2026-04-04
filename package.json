@@ -1,0 +1,16 @@
+{
+  "name": "yt-downloader",
+  "version": "1.0.0",
+  "description": "YouTube to MP4/MP3 downloader",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --inspect"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^41.1.1"
+  }
+}
