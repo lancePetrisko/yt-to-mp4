@@ -24,7 +24,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  startExpressServer(sendProgress);
+  startExpressServer(sendProgress, app.getPath('userData'));
   createWindow();
 
   app.on('activate', () => {

@@ -32,7 +32,14 @@ ffmpeg -version
 
 > **Windows note:** If yt-dlp was installed via pip and isn't on PATH, the app automatically falls back to `python -m yt_dlp`. ffmpeg is auto-detected from common install locations even if not on PATH.
 
-## Install & Run
+## Install (end-user)
+
+1. Make sure [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org) are installed (see Prerequisites above)
+2. Download `YT Downloader Setup x.x.x.exe` from the [Releases](https://github.com/lancePetrisko/yt-to-mp4/releases) page
+3. Run the installer — choose your install directory when prompted
+4. Launch **YT Downloader** from the Start Menu or desktop shortcut
+
+## Development
 
 ```bash
 git clone https://github.com/lancePetrisko/yt-to-mp4.git
@@ -46,6 +53,22 @@ To open with DevTools:
 ```bash
 npm run dev
 ```
+
+### Building the installer
+
+```bash
+npm run build
+```
+
+This produces an NSIS installer at `dist/YT Downloader Setup x.x.x.exe`.
+
+For a standalone portable executable (no install required):
+
+```bash
+npm run build:portable
+```
+
+Build output goes to `dist/` (gitignored).
 
 ## Stack
 
@@ -62,6 +85,8 @@ yt-to-mp4/
 ├── main.js           # Electron main process, boots Express
 ├── preload.js        # contextBridge IPC (window.electronAPI)
 ├── package.json
+├── build/
+│   └── icon.ico      # App icon (used by installer)
 ├── renderer/
 │   ├── index.html
 │   ├── app.js
@@ -72,4 +97,7 @@ yt-to-mp4/
 
 ## Logs
 
-Each download writes a timestamped log to `logs/<id>.log`. Click the **Logs** button on any queue item to view it in-app.
+Each download writes a timestamped log. Click the **Logs** button on any queue item to view it in-app.
+
+- **Development:** `logs/<id>.log` (project root)
+- **Installed app:** `%APPDATA%/yt-downloader/logs/<id>.log`

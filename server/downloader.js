@@ -62,8 +62,7 @@ app.use(express.json());
 const downloads = new Map();
 let progressCallback = null;
 
-const logsDir = path.join(__dirname, '..', 'logs');
-if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+let logsDir = path.join(__dirname, '..', 'logs');
 
 function generateId() {
   return crypto.randomBytes(6).toString('hex');
@@ -266,8 +265,12 @@ app.get('/logs/:id', (req, res) => {
   res.json({ id: req.params.id, logs: entry.logs });
 });
 
-function startExpressServer(onProgress) {
+function startExpressServer(onProgress, userDataPath) {
   progressCallback = onProgress;
+  if (userDataPath) {
+    logsDir = path.join(userDataPath, 'logs');
+  }
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
   app.listen(3131, '127.0.0.1', () => {
     console.log('Express server running on http://127.0.0.1:3131');
   });
