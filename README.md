@@ -2,8 +2,6 @@
 
 A local desktop app for downloading YouTube videos as MP4 or MP3. Built with Electron + Node.js.
 
-![Dark UI with download queue, progress bars, quality selector, and format toggle](https://via.placeholder.com/800x450?text=YT+Downloader+Screenshot)
-
 ## Features
 
 - Download queue — add multiple URLs and start them all at once
