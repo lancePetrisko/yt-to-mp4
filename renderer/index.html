@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src http://localhost:3131" />
-  <title>YT Downloader</title>
+  <title>Downloader</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -13,7 +13,7 @@
   <!-- Header -->
   <header class="header">
     <h1>YT<span>Down</span></h1>
-    <span class="header-subtitle">YouTube → MP4 / MP3</span>
+    <span class="header-subtitle">YouTube · Twitch · Kick → MP4 / MP3</span>
   </header>
 
   <!-- Queue -->
@@ -44,27 +44,23 @@
       <h2>Add Download</h2>
 
       <div class="form-group">
-        <label for="inputUrl">YouTube URL</label>
+        <label for="inputUrl" id="labelInputUrl">URL</label>
         <input
           class="form-input"
           type="url"
           id="inputUrl"
-          placeholder="https://www.youtube.com/watch?v=..."
+          placeholder="Paste a YouTube, Twitch VOD, or Kick URL…"
           autocomplete="off"
           spellcheck="false"
         />
+        <span class="platform-hint hidden" id="platformHint"></span>
+        <div class="url-error hidden" id="urlError"></div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label for="inputQuality">Quality</label>
-          <select class="form-select" id="inputQuality">
-            <option value="2160p">2160p (4K)</option>
-            <option value="1080p" selected>1080p (FHD)</option>
-            <option value="720p">720p (HD)</option>
-            <option value="480p">480p</option>
-            <option value="360p">360p</option>
-          </select>
+          <select class="form-select" id="inputQuality"></select>
         </div>
 
         <div class="form-group">
@@ -96,6 +92,7 @@
     </div>
   </div>
 
+  <script src="platforms.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

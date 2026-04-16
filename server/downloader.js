@@ -55,6 +55,12 @@ function getFfmpegPath() {
   return null;
 }
 
+function detectPlatform(url) {
+  if (/twitch\.tv\/videos\//i.test(url)) return 'twitch';
+  if (/kick\.com/i.test(url))            return 'kick';
+  return 'youtube';
+}
+
 const app = express();
 app.use(express.json());
 
@@ -100,12 +106,14 @@ function parsePercent(line) {
 
 function buildArgs(item, ffmpeg) {
   const { url, quality, format, outputFolder } = item;
+  const platform = item.platform || detectPlatform(url);
   const folder = outputFolder || os.homedir();
   const outputTemplate = path.join(folder, '%(title)s.%(ext)s');
 
   const ffmpegArgs = ffmpeg ? ['--ffmpeg-location', ffmpeg] : [];
 
-  if (format === 'mp3') {
+  // MP3 — also triggered by Twitch "Audio Only" quality
+  if (format === 'mp3' || (platform === 'twitch' && quality === 'audio')) {
     return [
       '-x',
       '--audio-format', 'mp3',
@@ -116,13 +124,49 @@ function buildArgs(item, ffmpeg) {
     ];
   }
 
-  // MP4 — re-encode audio to AAC so Windows can always play the output.
-  const height = quality.replace('p', '');
+  // Build platform-specific format string
+  let formatStr;
+  let postprocArgs = [];
+
+  if (platform === 'twitch') {
+    // Twitch uses named format IDs, not height filters.
+    // Twitch VODs already have AAC audio — skip re-encode.
+    const twitchFormats = {
+      source:  'chunked/best',
+      '720p60': '720p60/chunked/best',
+      '480p30': '480p30/720p60/chunked/best',
+      '360p30': '360p30/480p30/chunked/best',
+    };
+    formatStr = twitchFormats[quality] || 'chunked/best';
+  } else if (platform === 'kick') {
+    // Kick serves VODs as pre-muxed HLS streams — no separate audio track.
+    // Requires curl_cffi for browser impersonation to bypass Kick's 403 protection:
+    //   pip install curl_cffi
+    const heightMap = { best: null, '1080p': 1080, '720p': 720, '480p': 480, '360p': 360 };
+    const height = heightMap[quality];
+    formatStr = height ? `b[height<=${height}]/b` : 'b';
+    // HLS streams from Kick are already in a playable container — no postproc needed.
+  } else {
+    // YouTube: separate DASH video+audio streams, merge and re-encode audio to AAC
+    // so Windows can always play the output.
+    const heightMap = {
+      '2160p': 2160, '1080p': 1080, '720p': 720, '480p': 480, '360p': 360,
+    };
+    const height = heightMap[quality];
+    formatStr = height
+      ? `bestvideo[height<=${height}]+bestaudio/best[height<=${height}]`
+      : 'bestvideo+bestaudio/best';
+    postprocArgs = ['--postprocessor-args', 'ffmpeg:-c:a aac -q:a 0'];
+  }
+
+  const impersonateArgs = platform === 'kick' ? ['--impersonate', 'chrome'] : [];
+
   return [
-    '-f', `bestvideo[height<=${height}]+bestaudio/best[height<=${height}]`,
+    '-f', formatStr,
     '--merge-output-format', 'mp4',
-    '--postprocessor-args', 'ffmpeg:-c:a aac -q:a 0',
+    ...postprocArgs,
     '--no-playlist',
+    ...impersonateArgs,
     ...ffmpegArgs,
     '-o', outputTemplate,
     url,
@@ -131,18 +175,25 @@ function buildArgs(item, ffmpeg) {
 
 // POST /add — register a download item, return id
 app.post('/add', (req, res) => {
-  const { url, quality, format, outputFolder } = req.body;
+  const { url, quality, format, outputFolder, platform: clientPlatform } = req.body;
   if (!url) return res.status(400).json({ error: 'url required' });
+
+  const platform = (clientPlatform && ['youtube', 'twitch', 'kick'].includes(clientPlatform))
+    ? clientPlatform
+    : detectPlatform(url);
+
+  const defaultQuality = platform === 'twitch' ? 'source' : platform === 'kick' ? 'best' : '1080p';
+  const resolvedQuality = quality || defaultQuality;
 
   const id = generateId();
   downloads.set(id, {
-    item: { url, quality: quality || '1080p', format: format || 'mp4', outputFolder },
+    item: { url, quality: resolvedQuality, format: format || 'mp4', outputFolder, platform },
     process: null,
     status: 'queued',
     logs: [],
   });
-  appendLog(id, 'INFO', `Queued: ${url} | quality=${quality || '1080p'} format=${format || 'mp4'}`);
-  res.json({ id });
+  appendLog(id, 'INFO', `Queued: ${url} | platform=${platform} quality=${resolvedQuality} format=${format || 'mp4'}`);
+  res.json({ id, platform });
 });
 
 // POST /start — begin downloading a queued item

@@ -621,6 +621,45 @@ body {
   color: var(--text-muted);
 }
 
+/* ── Platform badges ── */
+.badge-platform {
+  background: color-mix(in srgb, var(--platform-color) 15%, transparent);
+  color: var(--platform-color);
+  border: 1px solid color-mix(in srgb, var(--platform-color) 35%, transparent);
+}
+
+/* Platform hint pill shown below the URL input in the modal */
+.platform-hint {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+  background: color-mix(in srgb, var(--platform-color) 15%, transparent);
+  color: var(--platform-color);
+  border: 1px solid color-mix(in srgb, var(--platform-color) 35%, transparent);
+}
+
+.platform-hint.hidden { display: none; }
+
+/* Inline URL error message in the modal */
+.url-error {
+  font-size: 11px;
+  color: var(--error);
+  margin-top: 5px;
+}
+
+.url-error.hidden { display: none; }
+
+/* Input error state */
+.form-input.error {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(224, 92, 92, 0.15);
+}
+
 /* Log button in queue item */
 .btn-log {
   background: transparent;

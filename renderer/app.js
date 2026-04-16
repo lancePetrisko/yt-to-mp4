@@ -20,10 +20,67 @@ const btnModalAdd  = document.getElementById('btnModalAdd');
 const inputUrl     = document.getElementById('inputUrl');
 const inputQuality = document.getElementById('inputQuality');
 
+// ── Platform helpers ──────────────────────────────────────────────────────────
+function getPlatformLabel(platform) {
+  return (PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.youtube).label;
+}
+
+function getPlatformColor(platform) {
+  return (PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.youtube).color;
+}
+
+function updateQualityOptions(platform) {
+  const cfg = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.youtube;
+  inputQuality.innerHTML = cfg.qualityOptions
+    .map(o => `<option value="${o.value}">${o.label}</option>`)
+    .join('');
+  inputQuality.value = cfg.defaultQuality;
+}
+
+function detectAndUpdateModal(url) {
+  const trimmed = url.trim();
+  const hint    = document.getElementById('platformHint');
+  const errorEl = document.getElementById('urlError');
+  const labelEl = document.getElementById('labelInputUrl');
+
+  if (!trimmed) {
+    hint.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    inputUrl.classList.remove('error');
+    labelEl.textContent = 'URL';
+    updateQualityOptions('youtube');
+    return;
+  }
+
+  const platform = detectPlatform(trimmed);
+
+  if (!platform) {
+    hint.classList.add('hidden');
+    inputUrl.classList.add('error');
+    errorEl.textContent = 'Unsupported platform. Paste a YouTube, Twitch VOD (twitch.tv/videos/…), or Kick URL.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  inputUrl.classList.remove('error');
+  errorEl.classList.add('hidden');
+
+  const cfg = PLATFORM_CONFIG[platform];
+  hint.textContent = cfg.label;
+  hint.style.setProperty('--platform-color', cfg.color);
+  hint.classList.remove('hidden');
+  labelEl.textContent = `${cfg.label} URL`;
+  updateQualityOptions(platform);
+}
+
 // ── Modal ─────────────────────────────────────────────────────────────────────
 function openModal() {
   inputUrl.value = '';
-  inputQuality.value = '1080p';
+  document.getElementById('platformHint').classList.add('hidden');
+  document.getElementById('urlError').classList.add('hidden');
+  document.getElementById('labelInputUrl').textContent = 'URL';
+  inputUrl.classList.remove('error');
+  updateQualityOptions('youtube');
   document.getElementById('fmtMp4').checked = true;
   modalOverlay.classList.remove('hidden');
   setTimeout(() => inputUrl.focus(), 50);
@@ -50,10 +107,21 @@ inputUrl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addFromModal();
 });
 
+inputUrl.addEventListener('input', () => detectAndUpdateModal(inputUrl.value));
+
 async function addFromModal() {
   const url = inputUrl.value.trim();
   if (!url) {
     inputUrl.focus();
+    return;
+  }
+
+  const platform = detectPlatform(url);
+  if (!platform) {
+    const errorEl = document.getElementById('urlError');
+    errorEl.textContent = 'Unsupported platform. Only YouTube, Twitch VODs, and Kick are supported.';
+    errorEl.classList.remove('hidden');
+    inputUrl.classList.add('error');
     return;
   }
 
@@ -68,6 +136,7 @@ async function addFromModal() {
       quality,
       format,
       outputFolder,
+      platform,
     });
 
     if (res.error) {
@@ -75,7 +144,7 @@ async function addFromModal() {
       return;
     }
 
-    queue.set(res.id, { url, quality, format, status: 'queued', percent: 0 });
+    queue.set(res.id, { url, quality, format, platform, status: 'queued', percent: 0 });
     renderQueueItem(res.id);
     updateEmptyState();
   } catch (err) {
@@ -179,7 +248,17 @@ function renderQueueItem(id) {
     ? item.url.slice(0, 67) + '…'
     : item.url;
 
-  const formatClass = item.format === 'mp3' ? 'mp3' : '';
+  const isTwitchAudio = item.platform === 'twitch' && item.quality === 'audio';
+  const formatClass = (item.format === 'mp3' || isTwitchAudio) ? 'mp3' : '';
+  const formatLabel = (item.format === 'mp3' || isTwitchAudio) ? 'MP3' : 'MP4';
+
+  const platColor = getPlatformColor(item.platform);
+  const platLabel = getPlatformLabel(item.platform);
+
+  const qOpts = (PLATFORM_CONFIG[item.platform] || PLATFORM_CONFIG.youtube).qualityOptions;
+  const qSelectHtml = qOpts.map(o =>
+    `<option value="${o.value}"${o.value === item.quality ? ' selected' : ''}>${o.label}</option>`
+  ).join('');
 
   div.innerHTML = `
     <div class="item-top">
@@ -187,15 +266,14 @@ function renderQueueItem(id) {
       <div class="item-info">
         <div class="item-url" title="${escapeHtml(item.url)}">${escapeHtml(truncUrl)}</div>
         <div class="item-badges">
+          <span class="badge badge-platform" style="--platform-color:${platColor}" id="badge-p-${id}">${platLabel}</span>
           <span class="badge badge-quality" id="badge-q-${id}">${escapeHtml(item.quality)}</span>
-          <span class="badge badge-format ${formatClass}" id="badge-f-${id}">${item.format.toUpperCase()}</span>
+          <span class="badge badge-format ${formatClass}" id="badge-f-${id}">${formatLabel}</span>
         </div>
       </div>
       <div class="item-controls">
         <select class="item-select" id="sel-q-${id}" title="Quality">
-          ${['2160p','1080p','720p','480p','360p'].map(q =>
-            `<option value="${q}"${q === item.quality ? ' selected' : ''}>${q}</option>`
-          ).join('')}
+          ${qSelectHtml}
         </select>
         <select class="item-select" id="sel-f-${id}" title="Format">
           <option value="mp4"${item.format === 'mp4' ? ' selected' : ''}>MP4</option>
@@ -224,6 +302,13 @@ function renderQueueItem(id) {
   div.querySelector(`#sel-q-${id}`).addEventListener('change', (e) => {
     item.quality = e.target.value;
     document.getElementById(`badge-q-${id}`).textContent = item.quality;
+    // Update format badge if Twitch "Audio Only" is selected/deselected
+    if (item.platform === 'twitch') {
+      const isAudio = item.quality === 'audio';
+      const fBadge = document.getElementById(`badge-f-${id}`);
+      fBadge.textContent = (isAudio || item.format === 'mp3') ? 'MP3' : 'MP4';
+      fBadge.className = `badge badge-format${(isAudio || item.format === 'mp3') ? ' mp3' : ''}`;
+    }
   });
 
   div.querySelector(`#sel-f-${id}`).addEventListener('change', (e) => {
