@@ -144,9 +144,34 @@ async function addFromModal() {
       return;
     }
 
-    queue.set(res.id, { url, quality, format, platform, status: 'queued', percent: 0 });
+    queue.set(res.id, { url, quality, format, platform, status: 'queued', percent: 0, title: null, thumbnail: null });
     renderQueueItem(res.id);
     updateEmptyState();
+    startItem(res.id);
+
+    window.electronAPI.getVideoInfo(url).then((info) => {
+      const item = queue.get(res.id);
+      if (!item) return;
+      if (info.title) {
+        item.title = info.title;
+        const titleEl = document.getElementById(`title-${res.id}`);
+        if (titleEl) {
+          titleEl.textContent = info.title;
+          titleEl.classList.remove('loading');
+          titleEl.title = url;
+        }
+      }
+      if (info.thumbnail) {
+        item.thumbnail = info.thumbnail;
+        const img = document.getElementById(`thumb-img-${res.id}`);
+        const placeholder = document.getElementById(`thumb-placeholder-${res.id}`);
+        if (img) {
+          img.src = info.thumbnail;
+          img.style.display = '';
+          if (placeholder) placeholder.style.display = 'none';
+        }
+      }
+    }).catch(() => {});
   } catch (err) {
     alert('Failed to contact download server: ' + err.message);
   }
@@ -262,9 +287,12 @@ function renderQueueItem(id) {
 
   div.innerHTML = `
     <div class="item-top">
-      <div class="item-thumb">▶</div>
+      <div class="item-thumb">
+        <img id="thumb-img-${id}" style="display:none" alt="">
+        <span id="thumb-placeholder-${id}">▶</span>
+      </div>
       <div class="item-info">
-        <div class="item-url" title="${escapeHtml(item.url)}">${escapeHtml(truncUrl)}</div>
+        <div class="item-title loading" id="title-${id}" title="${escapeHtml(item.url)}">${escapeHtml(truncUrl)}</div>
         <div class="item-badges">
           <span class="badge badge-platform" style="--platform-color:${platColor}" id="badge-p-${id}">${platLabel}</span>
           <span class="badge badge-quality" id="badge-q-${id}">${escapeHtml(item.quality)}</span>

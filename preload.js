@@ -24,6 +24,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       body: JSON.stringify({ id }),
     }).then((r) => r.json()),
 
+  getVideoInfo: (url) =>
+    fetch('http://localhost:3131/info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    }).then((r) => r.json()),
+
   getLogs: (id) =>
     fetch(`http://localhost:3131/logs/${id}`).then((r) => r.json()),
 

@@ -173,6 +173,46 @@ function buildArgs(item, ffmpeg) {
   ];
 }
 
+// POST /info — fetch video title + thumbnail without downloading
+app.post('/info', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url required' });
+
+  const args = ['--print', 'title', '--print', 'thumbnail', '--no-warnings', '--skip-download', url];
+
+  let proc;
+  try {
+    proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    await new Promise((resolve, reject) => {
+      proc.once('error', reject);
+      proc.once('spawn', resolve);
+    });
+  } catch (spawnErr) {
+    if (spawnErr.code === 'ENOENT') {
+      proc = spawn('python', ['-m', 'yt_dlp', ...args], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      try {
+        await new Promise((resolve, reject) => {
+          proc.once('error', reject);
+          proc.once('spawn', resolve);
+        });
+      } catch (_) {
+        return res.json({ error: 'yt-dlp not found' });
+      }
+    } else {
+      return res.json({ error: spawnErr.message });
+    }
+  }
+
+  let stdout = '';
+  proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+
+  proc.on('close', (code) => {
+    if (code !== 0) return res.json({ error: `yt-dlp exited with code ${code}` });
+    const lines = stdout.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    res.json({ title: lines[0] || null, thumbnail: lines[1] || null });
+  });
+});
+
 // POST /add — register a download item, return id
 app.post('/add', (req, res) => {
   const { url, quality, format, outputFolder, platform: clientPlatform } = req.body;
