@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
 const { startExpressServer } = require("./server/downloader");
 
@@ -43,6 +43,9 @@ function sendProgress(data) {
 }
 
 // IPC handlers
+ipcMain.handle("open-external", (_event, url) => shell.openExternal(url));
+ipcMain.handle("get-version", () => app.getVersion());
+
 ipcMain.handle("select-folder", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openDirectory"],

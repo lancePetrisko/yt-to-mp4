@@ -41,4 +41,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeProgressListener: () => {
     ipcRenderer.removeAllListeners('progress');
   },
+
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  getVersion: () => ipcRenderer.invoke('get-version'),
 });

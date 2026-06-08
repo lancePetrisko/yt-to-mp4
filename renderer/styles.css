@@ -59,6 +59,14 @@ body {
   color: var(--accent);
 }
 
+.header-version {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+  vertical-align: middle;
+  letter-spacing: 0;
+}
+
 .header-subtitle {
   margin-left: 10px;
   font-size: 11px;
@@ -67,6 +75,20 @@ body {
   background: var(--bg-surface);
   border-radius: 20px;
   border: 1px solid var(--border);
+}
+
+.header-credit {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-decoration: none;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.header-credit:hover {
+  opacity: 1;
+  color: var(--accent);
 }
 
 /* ── Main queue area ── */

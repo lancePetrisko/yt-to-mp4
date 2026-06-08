@@ -90,6 +90,15 @@ function closeModal() {
   modalOverlay.classList.add('hidden');
 }
 
+window.electronAPI.getVersion().then((v) => {
+  document.getElementById('appVersion').textContent = v;
+});
+
+document.querySelector('.header-credit').addEventListener('click', (e) => {
+  e.preventDefault();
+  window.electronAPI.openExternal('https://lancepetrisko.com/');
+});
+
 btnAddUrl.addEventListener('click', openModal);
 btnModalCancel.addEventListener('click', closeModal);
 
