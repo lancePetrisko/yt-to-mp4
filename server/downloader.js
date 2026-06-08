@@ -88,9 +88,9 @@ function appendLog(id, source, text) {
   fs.appendFile(logFile, line + '\n', () => {});
 }
 
-function emitProgress(id, percent, status, message) {
+function emitProgress(id, percent, status, message, filePath) {
   if (progressCallback) {
-    progressCallback({ id, percent, status, message });
+    progressCallback({ id, percent, status, message, filePath });
   }
 }
 
@@ -231,6 +231,7 @@ app.post('/add', (req, res) => {
     process: null,
     status: 'queued',
     logs: [],
+    filePath: null,
   });
   appendLog(id, 'INFO', `Queued: ${url} | platform=${platform} quality=${resolvedQuality} format=${format || 'mp4'}`);
   res.json({ id, platform });
@@ -300,6 +301,15 @@ app.post('/start', async (req, res) => {
       if (line.includes('[Merger]') || line.includes('Merging formats')) {
         emitProgress(id, 99, 'merging', 'Merging video and audio...');
       }
+      // Track the output file path from yt-dlp output lines
+      const mergerMatch = trimmed.match(/\[Merger\] Merging formats into "(.+)"$/);
+      if (mergerMatch) { entry.filePath = mergerMatch[1]; }
+      const destMatch = trimmed.match(/\[(?:download|ExtractAudio|VideoConvertor)\] Destination: (.+)$/);
+      if (destMatch) { entry.filePath = destMatch[1]; }
+      const moveMatch = trimmed.match(/\[MoveFiles\] Moving file ".*?" to "(.+)"$/);
+      if (moveMatch) { entry.filePath = moveMatch[1]; }
+      const alreadyMatch = trimmed.match(/^\[download\] (.+) has already been downloaded$/);
+      if (alreadyMatch) { entry.filePath = alreadyMatch[1]; }
     }
   });
 
@@ -307,7 +317,10 @@ app.post('/start', async (req, res) => {
     const text = chunk.toString().trim();
     if (text) {
       appendLog(id, 'STDERR', text);
-      emitProgress(id, null, 'error', text);
+      // yt-dlp writes WARNINGs to stderr — don't treat those as fatal errors
+      if (!text.startsWith('WARNING:')) {
+        emitProgress(id, null, 'error', text);
+      }
     }
   });
 
@@ -316,7 +329,7 @@ app.post('/start', async (req, res) => {
     appendLog(id, 'EXIT', `yt-dlp exited with code ${code}`);
     if (code === 0) {
       entry.status = 'done';
-      emitProgress(id, 100, 'done', 'Complete');
+      emitProgress(id, 100, 'done', 'Complete', entry.filePath);
     } else if (code === null) {
       entry.status = 'cancelled';
       emitProgress(id, null, 'cancelled', 'Cancelled');

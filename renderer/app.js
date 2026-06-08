@@ -153,7 +153,7 @@ async function addFromModal() {
       return;
     }
 
-    queue.set(res.id, { url, quality, format, platform, status: 'queued', percent: 0, title: null, thumbnail: null });
+    queue.set(res.id, { url, quality, format, platform, status: 'queued', percent: 0, title: null, thumbnail: null, filePath: null });
     renderQueueItem(res.id);
     updateEmptyState();
     startItem(res.id);
@@ -250,9 +250,15 @@ function removeItem(id) {
 
 // ── Progress events ───────────────────────────────────────────────────────────
 window.electronAPI.onProgress((data) => {
-  const { id, percent, status, message } = data;
+  const { id, percent, status, message, filePath } = data;
   const item = queue.get(id);
   if (!item) return;
+
+  if (filePath) {
+    item.filePath = filePath;
+    const pathEl = document.getElementById(`file-path-${id}`);
+    if (pathEl) pathEl.textContent = filePath;
+  }
 
   if (percent !== null && percent !== undefined) {
     item.percent = percent;
@@ -307,6 +313,7 @@ function renderQueueItem(id) {
           <span class="badge badge-quality" id="badge-q-${id}">${escapeHtml(item.quality)}</span>
           <span class="badge badge-format ${formatClass}" id="badge-f-${id}">${formatLabel}</span>
         </div>
+        <div class="item-file-path" id="file-path-${id}"></div>
       </div>
       <div class="item-controls">
         <select class="item-select" id="sel-q-${id}" title="Quality">
@@ -317,6 +324,7 @@ function renderQueueItem(id) {
           <option value="mp3"${item.format === 'mp3' ? ' selected' : ''}>MP3</option>
         </select>
         <button class="btn btn-log" id="btn-log-${id}" title="View logs">Logs</button>
+        <button class="btn btn-ghost" id="btn-reveal-${id}" title="Show in folder" style="display:none">See File</button>
         <button class="btn btn-primary btn-icon" id="btn-start-${id}" title="Start">▶</button>
         <button class="btn btn-danger btn-icon" id="btn-cancel-${id}" title="Cancel" style="display:none">■</button>
         <button class="btn btn-ghost btn-icon" id="btn-remove-${id}" title="Remove">✕</button>
@@ -356,6 +364,10 @@ function renderQueueItem(id) {
   });
 
   div.querySelector(`#btn-log-${id}`).addEventListener('click', () => showLogs(id));
+  div.querySelector(`#btn-reveal-${id}`).addEventListener('click', () => {
+    const fp = queue.get(id)?.filePath;
+    if (fp) window.electronAPI.showItemInFolder(fp);
+  });
   div.querySelector(`#btn-start-${id}`).addEventListener('click', () => startItem(id));
   div.querySelector(`#btn-cancel-${id}`).addEventListener('click', () => cancelItem(id));
   div.querySelector(`#btn-remove-${id}`).addEventListener('click', () => removeItem(id));
@@ -371,10 +383,11 @@ function updateItemUI(id) {
   // Update status class
   el.className = `queue-item status-${item.status}`;
 
-  const progFill = document.getElementById(`prog-${id}`);
-  const pctLabel = document.getElementById(`pct-${id}`);
+  const progFill  = document.getElementById(`prog-${id}`);
+  const pctLabel  = document.getElementById(`pct-${id}`);
   const btnStart  = document.getElementById(`btn-start-${id}`);
   const btnCancel = document.getElementById(`btn-cancel-${id}`);
+  const btnReveal = document.getElementById(`btn-reveal-${id}`);
   const selQ = document.getElementById(`sel-q-${id}`);
   const selF = document.getElementById(`sel-f-${id}`);
 
@@ -402,6 +415,7 @@ function updateItemUI(id) {
     btnStart.style.display  = isFinal ? 'none' : '';
     btnCancel.style.display = 'none';
   }
+  if (btnReveal) btnReveal.style.display = (isDone && item.filePath) ? '' : 'none';
 
   // Disable selects while running or done
   if (selQ) selQ.disabled = isRunning || isFinal;

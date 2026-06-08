@@ -214,6 +214,17 @@ body {
   flex-wrap: wrap;
 }
 
+.item-file-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
 .badge {
   font-size: 10px;
   font-weight: 600;

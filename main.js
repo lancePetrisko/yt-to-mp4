@@ -44,6 +44,7 @@ function sendProgress(data) {
 
 // IPC handlers
 ipcMain.handle("open-external", (_event, url) => shell.openExternal(url));
+ipcMain.handle("show-item-in-folder", (_event, filePath) => shell.showItemInFolder(filePath));
 ipcMain.handle("get-version", () => app.getVersion());
 
 ipcMain.handle("select-folder", async () => {
