@@ -1,7 +1,7 @@
-# YT Downloader — Claude Code Notes
+# YTDown — Claude Code Notes
 
 ## Project overview
-Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to download YouTube videos as MP4/MP3.
+Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to download YouTube, Twitch VOD, and Kick videos as MP4/MP3.
 
 ## Architecture
 - `main.js` — Electron main process, boots Express, IPC handlers
@@ -27,16 +27,45 @@ Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to downl
 - `--postprocessor-args "ffmpeg:-c:a aac -q:a 0"` forces re-encoding to AAC during merge
 - This ensures the output MP4 plays in Windows Media Player / Movies & TV
 
+### Output file path tracking
+- yt-dlp stdout is parsed for several patterns to capture the final output path:
+  - `[download] Destination: <path>` — initial file write
+  - `[Merger] Merging formats into "<path>"` — post-merge output
+  - `[ExtractAudio] Destination: <path>` — MP3 extraction
+  - `[MoveFiles] Moving file "..." to "<path>"` — post-processor move
+  - `[download] <path> has already been downloaded` — cached file
+- The resolved path is sent with the `done` progress event and shown in the UI
+- `shell.showItemInFolder` opens Explorer with the file highlighted ("See File" button)
+
+### stderr filtering
+- yt-dlp writes `WARNING:` lines to stderr that are non-fatal (e.g. missing JS runtime)
+- Only non-WARNING stderr lines flip the card status to error
+
 ### Logging
 - Each download gets a timestamped log in `logs/<id>.log`
 - Captures: CMD invoked, all stdout/stderr, exit code
 - Viewable in-app via the Logs button per queue item
 - Logs dir is gitignored
 
+### Version display
+- `app.getVersion()` is exposed via IPC (`get-version`) and shown next to the title in the header
+- Version is driven by the `version` field in `package.json` — bump it before building
+
+### Self-promo link
+- "by Lance Petrisko" credit in the top-right of the header
+- Click opens https://lancepetrisko.com/ via `shell.openExternal` (IPC: `open-external`)
+
 ## Commands
 - `npm start` — run the app
 - `npm run dev` — run with DevTools inspector
+- `npm run build` — build NSIS installer to `dist/`
+- `npm run build:portable` — build portable exe to `dist/`
+
+## Releasing
+1. Bump `version` in `package.json`
+2. `npm run build`
+3. Upload `dist/YT Downloader Setup x.x.x.exe` to GitHub Releases
 
 ## Dependencies
 - System: yt-dlp (via pip or standalone), ffmpeg (via winget/choco/manual)
-- npm: express, electron
+- npm: express, electron, electron-builder
