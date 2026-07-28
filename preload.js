@@ -44,5 +44,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getVersion: () => ipcRenderer.invoke('get-version'),
+  readClipboard: () => ipcRenderer.invoke('read-clipboard'),
   showItemInFolder: (filePath) => ipcRenderer.invoke('show-item-in-folder', filePath),
 });

@@ -74,8 +74,8 @@ function detectAndUpdateModal(url) {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
-function openModal() {
-  inputUrl.value = '';
+function openModal(prefillUrl = '') {
+  inputUrl.value = prefillUrl;
   document.getElementById('platformHint').classList.add('hidden');
   document.getElementById('urlError').classList.add('hidden');
   document.getElementById('labelInputUrl').textContent = 'URL';
@@ -83,7 +83,18 @@ function openModal() {
   updateQualityOptions('youtube');
   document.getElementById('fmtMp4').checked = true;
   modalOverlay.classList.remove('hidden');
-  setTimeout(() => inputUrl.focus(), 50);
+  if (prefillUrl) detectAndUpdateModal(prefillUrl);
+  setTimeout(() => {
+    inputUrl.focus();
+    inputUrl.select();
+  }, 50);
+}
+
+function showModalError(message) {
+  const errorEl = document.getElementById('urlError');
+  errorEl.textContent = message;
+  errorEl.classList.remove('hidden');
+  inputUrl.classList.add('error');
 }
 
 function closeModal() {
@@ -99,8 +110,41 @@ document.querySelector('.header-credit').addEventListener('click', (e) => {
   window.electronAPI.openExternal('https://lancepetrisko.com/');
 });
 
-btnAddUrl.addEventListener('click', openModal);
+btnAddUrl.addEventListener('click', () => openModal());
 btnModalCancel.addEventListener('click', closeModal);
+
+// ── Magnet (clipboard grab) ───────────────────────────────────────────────────
+// Pull the first http(s) URL out of arbitrary clipboard text.
+function extractUrl(text) {
+  if (!text) return null;
+  const match = String(text).match(/https?:\/\/[^\s<>"']+/);
+  return match ? match[0].replace(/[.,;)\]]+$/, '') : null;
+}
+
+async function magnetGrab() {
+  let text = '';
+  try {
+    text = await window.electronAPI.readClipboard();
+  } catch (_) {}
+
+  const url = extractUrl(text);
+
+  if (!url) {
+    openModal();
+    showModalError('No URL found on the clipboard. Copy a link and try again.');
+    return;
+  }
+
+  if (!detectPlatform(url)) {
+    openModal(url);
+    showModalError('Clipboard URL is an unsupported platform. Only YouTube, Twitch VODs, and Kick work.');
+    return;
+  }
+
+  openModal(url);
+}
+
+document.getElementById('btnMagnet').addEventListener('click', magnetGrab);
 
 modalOverlay.addEventListener('click', (e) => {
   if (e.target === modalOverlay) closeModal();
@@ -108,6 +152,11 @@ modalOverlay.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
+  // Cmd/Ctrl+G — Cmd+M is taken by macOS window minimize
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+    e.preventDefault();
+    magnetGrab();
+  }
 });
 
 btnModalAdd.addEventListener('click', addFromModal);

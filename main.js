@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require("electron");
 const path = require("path");
 const { startExpressServer } = require("./server/downloader");
 
@@ -46,6 +46,7 @@ function sendProgress(data) {
 ipcMain.handle("open-external", (_event, url) => shell.openExternal(url));
 ipcMain.handle("show-item-in-folder", (_event, filePath) => shell.showItemInFolder(filePath));
 ipcMain.handle("get-version", () => app.getVersion());
+ipcMain.handle("read-clipboard", () => clipboard.readText());
 
 ipcMain.handle("select-folder", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
