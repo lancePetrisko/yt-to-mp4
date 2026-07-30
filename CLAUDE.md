@@ -11,15 +11,49 @@ Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to downl
 
 ## Key technical decisions
 
+### Bundled binaries
+- yt-dlp and ffmpeg ship inside the installers so end users install nothing
+- `scripts/fetch-binaries.js` downloads them into `build/bin/<platform>-<arch>/` (gitignored);
+  the build scripts run it automatically before electron-builder
+- Sources: yt-dlp from its own GitHub releases (`yt-dlp.exe`, `yt-dlp_macos` — universal2, so
+  one file covers both Mac arches); ffmpeg 8.1 GPL builds from BtbN (Windows) and
+  martin-riedl.de (macOS), both pinned rather than rolling so the binary keeps matching the
+  source linked for GPL compliance
+- **Never use evermeet.cx or the `ffmpeg-static` npm release binaries for macOS.** They are
+  built with `--enable-nonfree`, which makes them unredistributable by anyone. This was
+  shipped once by mistake and caught only by reading the configure line out of the binary.
+- `assertRedistributable()` extracts the `./configure` line from every downloaded ffmpeg and
+  hard-fails on `--enable-nonfree`; it also records the line into
+  `build/bin/<target>/BUILD-INFO.txt`, which ships inside the app as `resources/bin/BUILD-INFO.txt`
+- `THIRD-PARTY-NOTICES.md` is what accompanies a release; it carries the GPL source offer
+- The app spawns ffmpeg/yt-dlp as separate processes and never links them, so YTDown's own
+  code stays MIT
+- `extraResources` is declared **per target** (inside the `win` and `mac` blocks) with the
+  platform hardcoded: `build/bin/win32-${arch}` and `build/bin/darwin-${arch}` → `resources/bin`
+- **Do not use `${platform}` there.** It resolves to the *host* OS, not the build target, so a
+  Windows installer cross-built on a Mac silently shipped the macOS binaries. `${arch}` is
+  correct and does track the target arch.
+- `win` pins `arch: ["x64"]` — electron-builder otherwise defaults to the host arch, which on an
+  Apple Silicon Mac produces a Windows-on-ARM installer
+- `getBundledBinary()` in `server/downloader.js` resolves `process.resourcesPath/bin` when
+  packaged, falling back to `build/bin/<platform>-<arch>/` when running from source
+- **ffmpeg is GPL-licensed** — bundling it means the distributed app must comply with the GPL
+
 ### yt-dlp invocation
-- Primary: tries spawning `yt-dlp` directly
-- Fallback: `python -m yt_dlp` (pip user install may not be on PATH)
-- Uses `await` on the spawn/error events to detect ENOENT before proceeding
+- `getYtDlpInvocations()` returns candidates best-first: bundled binary → `yt-dlp` on PATH →
+  `python -m yt_dlp` (pip user install may not be on PATH)
+- `spawnYtDlp()` walks that list, `await`ing the spawn/error events to detect ENOENT before
+  moving on; a non-ENOENT error is surfaced instead of silently falling through
+- The invocation actually used is written to the per-download log
 
 ### ffmpeg detection
 - Electron inherits PATH from when it launched, NOT the current system PATH
 - `where.exe` also fails inside Electron for the same reason
-- Solution: `getFfmpegPath()` scans common install locations (winget packages dir, Program Files, chocolatey, scoop, etc.)
+- `getFfmpegPath()` order: bundled copy → PATH (`where.exe` on Windows, `/usr/bin/which`
+  elsewhere) → scan of common install locations (Homebrew arm64/Intel, MacPorts, winget
+  packages dir, Program Files, chocolatey, scoop)
+- The bundled copy makes the PATH problem moot for installed builds; the scan still matters
+  when running from source
 - The resolved path is passed via `--ffmpeg-location <path>` to yt-dlp
 
 ### Audio codec
@@ -98,8 +132,19 @@ Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to downl
 ## Commands
 - `npm start` — run the app
 - `npm run dev` — run with DevTools inspector
-- `npm run build` — build NSIS installer to `dist/`
-- `npm run build:portable` — build portable exe to `dist/`
+- `npm run fetch-binaries` — download yt-dlp + ffmpeg for the host platform
+- `npm run build` — Windows NSIS installer to `dist/`
+- `npm run build:portable` — portable Windows exe to `dist/`
+- `npm run build:mac` — macOS dmg (arm64 + x64) to `dist/`
+- `npm run build:all` — every target
+- `npm run bump` — manual patch bump
+
+## Platform support
+- Mac target: dmg for arm64 and x64, icon at `build/icon.icns` (generated from `icon.ico`
+  via `sips` + `iconutil`)
+- Neither target is code-signed: Windows shows SmartScreen, macOS needs right-click → Open
+  on first launch. Signing needs an Apple Developer account and a Windows cert.
+- `.dmg` must be built on a Mac; Windows installers cross-build from macOS only with Wine
 
 ## Releasing
 1. Version is already bumped by the commit hooks — only edit `package.json` by hand for a

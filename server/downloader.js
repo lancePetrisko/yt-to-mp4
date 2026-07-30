@@ -5,24 +5,73 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 
-// Find ffmpeg by checking PATH via where.exe, then falling back to
-// common install locations so it works even when Electron's PATH is stale.
+const IS_WINDOWS = process.platform === 'win32';
+const EXE = IS_WINDOWS ? '.exe' : '';
+
+// Binaries shipped inside the installer, so a user never has to install yt-dlp or
+// ffmpeg by hand. Packaged builds get them via electron-builder extraResources
+// (resources/bin); running from source falls back to whatever
+// `npm run fetch-binaries` dropped in build/bin/<platform>-<arch>/.
+function getBundledBinary(name) {
+  const file = `${name}${EXE}`;
+  const candidates = [];
+
+  if (process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, 'bin', file));
+  }
+  candidates.push(
+    path.join(__dirname, '..', 'build', 'bin', `${process.platform}-${process.arch}`, file)
+  );
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch (_) {}
+  }
+  return null;
+}
+
+// Look a command up on PATH using the OS's own resolver.
+function whichOnPath(command) {
+  try {
+    // Full path to where.exe so it reads the live registry PATH — Electron's
+    // inherited PATH is stale (see notes in CLAUDE.md).
+    const cmd = IS_WINDOWS
+      ? `C:\\Windows\\System32\\where.exe ${command}`
+      : `/usr/bin/which ${command}`;
+    const result = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const found = result.split('\n')[0].trim();
+    return found || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Find ffmpeg: bundled copy first, then PATH, then common install locations so it
+// works even when Electron's PATH is stale.
 let ffmpegPath = null;
 function getFfmpegPath() {
   if (ffmpegPath) return ffmpegPath;
 
-  // 1. Try where.exe with the full system32 path so it reads the live registry PATH
-  try {
-    const result = execSync('C:\\Windows\\System32\\where.exe ffmpeg', {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const found = result.split('\n')[0].trim();
-    if (found) { ffmpegPath = found; return ffmpegPath; }
-  } catch (_) {}
+  // 1. Bundled with the app — the normal case for installed builds
+  const bundled = getBundledBinary('ffmpeg');
+  if (bundled) { ffmpegPath = bundled; return ffmpegPath; }
 
-  // 2. Scan common install locations
+  // 2. On PATH
+  const onPath = whichOnPath('ffmpeg');
+  if (onPath) { ffmpegPath = onPath; return ffmpegPath; }
+
+  // 3. Scan common install locations
+  const macLinuxCandidates = IS_WINDOWS ? [] : [
+    '/opt/homebrew/bin/ffmpeg',      // Homebrew on Apple Silicon
+    '/usr/local/bin/ffmpeg',         // Homebrew on Intel / manual installs
+    '/opt/local/bin/ffmpeg',         // MacPorts
+    '/usr/bin/ffmpeg',
+    path.join(os.homedir(), 'bin', 'ffmpeg'),
+  ];
+
   const candidates = [
+    ...macLinuxCandidates,
     // winget default package dirs
     ...(() => {
       try {
@@ -53,6 +102,51 @@ function getFfmpegPath() {
   }
 
   return null;
+}
+
+// Ways to invoke yt-dlp, best first: the copy shipped in the installer, then one
+// on PATH, then a pip install that isn't on PATH.
+function getYtDlpInvocations() {
+  const invocations = [];
+
+  const bundled = getBundledBinary('yt-dlp');
+  if (bundled) invocations.push({ cmd: bundled, prefix: [], label: 'bundled yt-dlp' });
+
+  invocations.push({ cmd: 'yt-dlp', prefix: [], label: 'yt-dlp on PATH' });
+
+  const pythons = IS_WINDOWS ? ['python', 'py'] : ['python3', 'python'];
+  for (const python of pythons) {
+    invocations.push({ cmd: python, prefix: ['-m', 'yt_dlp'], label: `${python} -m yt_dlp` });
+  }
+
+  return invocations;
+}
+
+// Spawn yt-dlp, walking the fallback list until one actually launches. Resolves
+// with the live process; rejects only if every option is missing.
+async function spawnYtDlp(args) {
+  let lastErr = null;
+
+  for (const invocation of getYtDlpInvocations()) {
+    const proc = spawn(invocation.cmd, [...invocation.prefix, ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        proc.once('error', reject);
+        proc.once('spawn', resolve);
+      });
+      return { proc, invocation };
+    } catch (err) {
+      lastErr = err;
+      // Anything other than "not installed" is a real failure worth surfacing.
+      if (err.code !== 'ENOENT') throw err;
+    }
+  }
+
+  throw lastErr || new Error('yt-dlp not found');
 }
 
 function detectPlatform(url) {
@@ -193,25 +287,11 @@ app.post('/info', async (req, res) => {
 
   let proc;
   try {
-    proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    await new Promise((resolve, reject) => {
-      proc.once('error', reject);
-      proc.once('spawn', resolve);
-    });
+    ({ proc } = await spawnYtDlp(args));
   } catch (spawnErr) {
-    if (spawnErr.code === 'ENOENT') {
-      proc = spawn('python', ['-m', 'yt_dlp', ...args], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-      try {
-        await new Promise((resolve, reject) => {
-          proc.once('error', reject);
-          proc.once('spawn', resolve);
-        });
-      } catch (_) {
-        return res.json({ error: 'yt-dlp not found' });
-      }
-    } else {
-      return res.json({ error: spawnErr.message });
-    }
+    return res.json({
+      error: spawnErr.code === 'ENOENT' ? 'yt-dlp not found' : spawnErr.message,
+    });
   }
 
   let stdout = '';
@@ -260,38 +340,21 @@ app.post('/start', async (req, res) => {
   const args = buildArgs(entry.item, ffmpeg);
   appendLog(id, 'CMD', `yt-dlp ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`);
 
-  // Try yt-dlp directly first; fall back to python -m yt_dlp if not on PATH
+  // Bundled binary first, then PATH, then a pip install that isn't on PATH
   let proc;
   try {
-    proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    // Test immediately if the binary was found
-    await new Promise((resolve, reject) => {
-      proc.once('error', reject);
-      proc.once('spawn', resolve);
-    });
+    const launched = await spawnYtDlp(args);
+    proc = launched.proc;
+    appendLog(id, 'INFO', `Using ${launched.invocation.label}`);
   } catch (spawnErr) {
-    if (spawnErr.code === 'ENOENT') {
-      appendLog(id, 'INFO', 'yt-dlp not found on PATH, retrying with python -m yt_dlp');
-      proc = spawn('python', ['-m', 'yt_dlp', ...args], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-      try {
-        await new Promise((resolve, reject) => {
-          proc.once('error', reject);
-          proc.once('spawn', resolve);
-        });
-      } catch (err2) {
-        appendLog(id, 'STDERR', `Failed to launch yt-dlp: ${err2.message}`);
-        entry.process = null;
-        entry.status = 'error';
-        emitProgress(id, null, 'error', 'yt-dlp not found. Install it and ensure it is on PATH.');
-        return res.json({ ok: true });
-      }
-    } else {
-      appendLog(id, 'STDERR', `Spawn error: ${spawnErr.message}`);
-      entry.process = null;
-      entry.status = 'error';
-      emitProgress(id, null, 'error', spawnErr.message);
-      return res.json({ ok: true });
-    }
+    const message = spawnErr.code === 'ENOENT'
+      ? 'yt-dlp not found. Reinstall the app, or install yt-dlp and put it on PATH.'
+      : spawnErr.message;
+    appendLog(id, 'STDERR', `Failed to launch yt-dlp: ${spawnErr.message}`);
+    entry.process = null;
+    entry.status = 'error';
+    emitProgress(id, null, 'error', message);
+    return res.json({ ok: true });
   }
 
   entry.process = proc;

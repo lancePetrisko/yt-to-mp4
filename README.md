@@ -16,42 +16,28 @@ Developed and maintained by [Lance Petrisko](https://lancepetrisko.com).
 - Cancel individual downloads mid-stream
 - See File — reveals the output file in Explorer (Windows) or Finder (macOS)
 - Version displayed in the title bar, driven by `package.json`
-
-## Prerequisites
-
-Both tools must be installed on the system.
-
-**macOS** ([Homebrew](https://brew.sh)):
-
-```bash
-brew install yt-dlp ffmpeg
-```
-
-**Windows:**
-
-```powershell
-winget install yt-dlp
-winget install ffmpeg
-```
-
-`pip install yt-dlp` and `choco install ffmpeg` also work.
-
-Verify both:
-
-```bash
-yt-dlp --version
-ffmpeg -version
-```
-
-> **macOS note:** ffmpeg is resolved from `PATH` by yt-dlp itself. If the app reports ffmpeg missing while `ffmpeg -version` works in your shell, launch the app from a terminal (`npm start`) so it inherits your shell `PATH` — Electron launched from Finder gets a minimal `PATH` that omits `/opt/homebrew/bin`.
->
-> **Windows note:** If yt-dlp was installed via pip and isn't on `PATH`, the app falls back to `python -m yt_dlp`. ffmpeg is auto-detected from common install locations (winget, chocolatey, scoop, Program Files) even if not on `PATH`.
+- Zero setup — yt-dlp and ffmpeg ship inside the installer
+- Saves to your Downloads folder by default
 
 ## Install (end-user)
 
-1. Install [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org) (see Prerequisites above)
-2. **Windows:** download `YT Downloader Setup x.x.x.exe` from the [Releases](https://github.com/lancePetrisko/yt-to-mp4/releases) page, run the installer, choose an install directory, then launch **YT Downloader** from the Start Menu
-3. **macOS:** no prebuilt release yet — run from source (see Development below)
+**Nothing else to install.** yt-dlp and ffmpeg ship inside the installer — no terminal, no Homebrew, no PATH setup.
+
+**Windows:** download `YT Downloader Setup x.x.x.exe` from the [Releases](https://github.com/lancePetrisko/yt-to-mp4/releases) page, run it, pick an install directory, and launch **YT Downloader** from the Start Menu.
+
+**macOS:** download the `.dmg` for your Mac from [Releases](https://github.com/lancePetrisko/yt-to-mp4/releases) — `arm64` for Apple Silicon (M1 and newer), `x64` for Intel. Open it and drag the app to Applications.
+
+> **First launch on macOS:** the app isn't signed with an Apple Developer certificate, so macOS blocks it the first time. Right-click (or Control-click) the app → **Open** → **Open** in the dialog. Only needed once. Double-clicking normally just shows "damaged or can't be opened".
+
+### If you already have yt-dlp/ffmpeg installed
+
+That's fine — the app prefers its own bundled copies and ignores yours, so a broken or outdated system install can't break it. Resolution order for both tools:
+
+1. Bundled copy inside the app
+2. Whatever is on `PATH`
+3. (yt-dlp only) `python -m yt_dlp`, for pip installs that aren't on `PATH`
+
+The per-download log shows which one was used.
 
 ## Development
 
@@ -70,25 +56,45 @@ To open with DevTools:
 npm run dev
 ```
 
-### Building the installer
-
-Bump the `version` field in `package.json` first, then:
+Running from source uses the same bundled binaries as the installers. Fetch them once:
 
 ```bash
-npm run build
+npm run fetch-binaries
 ```
 
-This produces an NSIS installer at `dist/YT Downloader Setup x.x.x.exe`. The version is stamped into the installer and shown in the app UI automatically.
+Without them the app falls back to a system yt-dlp/ffmpeg on `PATH`.
 
-For a standalone portable Windows executable (no install required):
+### Building the installers
+
+The version bumps itself on commit (see below), so no manual edit is needed.
 
 ```bash
-npm run build:portable
+npm run build          # Windows NSIS installer
+npm run build:portable # Windows portable .exe
+npm run build:mac      # macOS .dmg, arm64 + x64
+npm run build:all      # everything
 ```
 
-Build output goes to `dist/` (gitignored).
+Each script downloads the right yt-dlp/ffmpeg binaries into `build/bin/<platform>-<arch>/` first, then electron-builder copies them into the app as `resources/bin`. Downloads are cached; `npm run fetch-binaries -- --force` re-fetches.
 
-> Both build scripts target Windows (`electron-builder --win`). Producing a macOS `.dmg` requires adding a `mac` target to the `build` block in `package.json` and building on a Mac. On macOS, `npm start` runs the app directly with no build step.
+Output lands in `dist/` (gitignored):
+
+- `YT Downloader Setup x.x.x.exe`
+- `YT Downloader x.x.x arm64.dmg` / `YT Downloader x.x.x x64.dmg`
+
+> **Cross-building:** macOS `.dmg` files must be built on a Mac. The Windows installer cross-builds fine from macOS — electron-builder downloads its own Wine and NSIS automatically (verified).
+>
+> **Code signing:** neither target is signed. Windows shows a SmartScreen warning ("More info" → "Run anyway"); macOS requires the right-click → Open dance on first launch. Removing those warnings means an Apple Developer account ($99/yr, plus notarization) and a Windows code-signing certificate.
+
+### Automatic versioning
+
+Git hooks bump the patch version once per push, so every build has a distinct version. Set up on `npm install`; manually it's `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify`.
+
+## Licensing
+
+YTDown's own code is MIT (see `LICENSE.txt`). The installers also bundle FFmpeg (GPL-3.0-or-later) and yt-dlp (Unlicense). Both are run as separate executables and are never linked against, so YTDown itself stays MIT.
+
+Publishing a release means shipping `THIRD-PARTY-NOTICES.md` alongside it — that file carries the FFmpeg source offer the GPL requires. `npm run fetch-binaries` refuses any FFmpeg build compiled with `--enable-nonfree`, since those cannot be redistributed at all.
 
 ## Stack
 
@@ -102,17 +108,28 @@ Build output goes to `dist/` (gitignored).
 
 ```
 yt-to-mp4/
-├── main.js           # Electron main process, boots Express
-├── preload.js        # contextBridge IPC (window.electronAPI)
+├── main.js               # Electron main process, boots Express
+├── preload.js            # contextBridge IPC (window.electronAPI)
 ├── package.json
+├── .githooks/            # Auto version bump on commit/push
+│   ├── pre-commit
+│   └── pre-push
+├── scripts/
+│   ├── bump-version.js   # Patch bump, used by the hooks
+│   └── fetch-binaries.js # Downloads yt-dlp + ffmpeg for bundling
 ├── build/
-│   └── icon.ico      # App icon (used by the Windows installer)
+│   ├── icon.ico          # App icon (Windows installer)
+│   ├── icon.icns         # App icon (macOS)
+│   └── bin/              # Fetched binaries, gitignored
+│       ├── win32-x64/
+│       ├── darwin-arm64/
+│       └── darwin-x64/
 ├── renderer/
 │   ├── index.html
 │   ├── app.js
 │   └── styles.css
 └── server/
-    └── downloader.js # yt-dlp/ffmpeg wrapper + Express routes
+    └── downloader.js     # yt-dlp/ffmpeg wrapper + Express routes
 ```
 
 ## Logs

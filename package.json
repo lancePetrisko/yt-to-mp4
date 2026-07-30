@@ -1,6 +1,6 @@
 {
   "name": "yt-downloader",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "YouTube to MP4/MP3 downloader",
   "main": "main.js",
   "scripts": {
@@ -8,8 +8,11 @@
     "start": "electron .",
     "dev": "electron . --inspect",
     "bump": "node scripts/bump-version.js",
-    "build": "electron-builder --win",
-    "build:portable": "electron-builder --win portable"
+    "fetch-binaries": "node scripts/fetch-binaries.js",
+    "build": "node scripts/fetch-binaries.js --platform=win32 --arch=x64 && electron-builder --win",
+    "build:portable": "node scripts/fetch-binaries.js --platform=win32 --arch=x64 && electron-builder --win portable",
+    "build:mac": "node scripts/fetch-binaries.js --platform=darwin --arch=arm64 && node scripts/fetch-binaries.js --platform=darwin --arch=x64 && electron-builder --mac",
+    "build:all": "node scripts/fetch-binaries.js --all && electron-builder --win --mac"
   },
   "build": {
     "appId": "com.ytdownloader.app",
@@ -24,14 +27,69 @@
       "renderer/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "build/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "extraResources": [
+        {
+          "from": "build/bin/win32-${arch}",
+          "to": "bin",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.utilities",
+      "artifactName": "${productName} ${version} ${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "build/bin/darwin-${arch}",
+          "to": "bin",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "contents": [
+        {
+          "x": 140,
+          "y": 200
+        },
+        {
+          "x": 400,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     }
   },
   "dependencies": {

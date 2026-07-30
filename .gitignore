@@ -6,5 +6,7 @@ logs/
 *.mkv
 dist/
 out/
+# Bundled yt-dlp/ffmpeg binaries — build artifacts, fetched by npm run fetch-binaries
+build/bin/
 .DS_Store
 Thumbs.db
