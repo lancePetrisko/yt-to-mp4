@@ -49,7 +49,26 @@ Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to downl
 
 ### Version display
 - `app.getVersion()` is exposed via IPC (`get-version`) and shown next to the title in the header
-- Version is driven by the `version` field in `package.json` — bump it before building
+- Version is driven by the `version` field in `package.json`
+
+### Automatic version bumping
+- Patch version bumps itself once per push batch — no manual editing before a release
+- `.githooks/pre-commit` bumps on the first commit made after the last push; later commits in
+  the same batch skip it, so one push = one increment regardless of commit count
+- `.githooks/pre-push` is a safety net: if a batch would reach GitHub with no version change
+  (commits made with `--no-verify`), it bumps, commits, and asks you to push again
+- **Why the bump is at commit time, not push time**: git resolves the SHAs it will send
+  *before* running pre-push, so a commit created inside a pre-push hook is never part of that
+  push. Verified — a naive pre-push bump leaves the commit stranded locally.
+- `scripts/bump-version.js` does the edit: `package.json` plus the two fields in
+  `package-lock.json` that describe this package (root `version`, `packages[""].version`).
+  Dependency versions are untouched.
+- Hooks live in `.githooks/` (tracked) and are wired via `core.hooksPath`, set by the
+  `prepare` npm script on install. One-time manual setup: `git config core.hooksPath .githooks`
+- Bypass with `YTD_NO_BUMP=1 git commit ...` / `git commit --no-verify`
+- Manual bump: `npm run bump`
+- `.githooks/` and `scripts/` are outside electron-builder's `files` whitelist, so they never
+  ship in the installer
 
 ### Theme ("Phosphor Terminal")
 - All colors live in `:root` in `renderer/styles.css` — reskin = swap that block only
@@ -73,7 +92,8 @@ Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to downl
 - `npm run build:portable` — build portable exe to `dist/`
 
 ## Releasing
-1. Bump `version` in `package.json`
+1. Version is already bumped by the commit hooks — only edit `package.json` by hand for a
+   minor/major bump
 2. `npm run build`
 3. Upload `dist/YT Downloader Setup x.x.x.exe` to GitHub Releases
 

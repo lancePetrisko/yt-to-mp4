@@ -1,0 +1,8 @@
+Make the default path download to downloads folder
+
+Make the windows installer also include ffempeg and
+yt-dlp for people who don't know how to use commands
+just make it dead simple
+
+Make a Mac installer with all the samer features as the
+windows installer

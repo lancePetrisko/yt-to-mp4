@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Safety net. The pre-commit hook is what normally bumps the version; this only
+# fires if a batch is about to reach GitHub with no version change in it at all
+# (e.g. commits made with --no-verify, or before the hooks were installed).
+#
+# It cannot bump and push in one go: git already resolved the SHAs to send
+# before this hook ran, so a commit made here would not be included. It bumps,
+# commits, and asks you to push again.
+#
+# Skip with:  YTD_NO_BUMP=1 git push ...   (or git push --no-verify)
+
+[ -n "$YTD_NO_BUMP" ] && exit 0
+
+zero=0000000000000000000000000000000000000000
+needs_bump=
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # Branch deletion — nothing to version.
+  [ "$local_sha" = "$zero" ] && continue
+  # Brand new branch on the remote: no sane base to diff against, leave it.
+  [ "$remote_sha" = "$zero" ] && continue
+
+  if git diff --quiet "$remote_sha" "$local_sha" -- package.json; then
+    needs_bump=1
+  fi
+done
+
+[ -z "$needs_bump" ] && exit 0
+
+new_version=$(node "$(git rev-parse --show-toplevel)/scripts/bump-version.js") || {
+  echo "pre-push: version bump failed, aborting push" >&2
+  exit 1
+}
+
+git commit --only package.json package-lock.json -m "chore: bump version to $new_version" >/dev/null || {
+  echo "pre-push: could not commit the version bump, aborting push" >&2
+  exit 1
+}
+
+cat >&2 <<EOF
+
+  These commits had no version bump in them.
+  Bumped to $new_version and committed it locally.
+
+  >> Run 'git push' again to ship it. <<
+
+  (The 'failed to push some refs' line below is this hook stopping the push
+   so the new commit can be included — nothing was pushed.)
+
+EOF
+exit 1

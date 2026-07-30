@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Bumps the patch version once per "ship cycle" — i.e. on the first commit made
+# after the last push. Later commits in the same batch don't re-bump, so one
+# push = one version increment, no matter how many commits it contains.
+#
+# The bump has to happen at commit time rather than in pre-push: git resolves
+# the SHAs it is going to send BEFORE running pre-push, so a commit created by
+# a pre-push hook is never part of that push.
+#
+# Skip with:  YTD_NO_BUMP=1 git commit ...   (or git commit --no-verify)
+
+[ -n "$YTD_NO_BUMP" ] && exit 0
+
+# Don't touch versions mid-merge or mid-rebase — those commits aren't new work.
+git_dir=$(git rev-parse --git-dir)
+if [ -e "$git_dir/MERGE_HEAD" ] || [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ]; then
+  exit 0
+fi
+
+# No commits yet: nothing has been pushed, so treat it as the start of a batch.
+if git rev-parse --verify --quiet HEAD >/dev/null; then
+  # Prefer the configured upstream; fall back to the remote-tracking ref for
+  # this branch, which still exists on clones that never set an upstream.
+  last_pushed=$(git rev-parse --verify --quiet '@{upstream}' 2>/dev/null)
+  if [ -z "$last_pushed" ]; then
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    remote=$(git config --get "branch.$branch.remote")
+    [ -z "$remote" ] && remote=origin
+    last_pushed=$(git rev-parse --verify --quiet "refs/remotes/$remote/$branch" 2>/dev/null)
+  fi
+
+  # A known push point that already differs from HEAD means this batch is
+  # underway and an earlier commit in it did the bump.
+  if [ -n "$last_pushed" ] && [ "$(git rev-parse HEAD)" != "$last_pushed" ]; then
+    exit 0
+  fi
+fi
+
+new_version=$(node "$(git rev-parse --show-toplevel)/scripts/bump-version.js") || {
+  echo "pre-commit: version bump failed, aborting commit" >&2
+  exit 1
+}
+
+git add package.json package-lock.json
+echo "pre-commit: version bumped to $new_version"
+exit 0
