@@ -51,6 +51,17 @@ Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to downl
 - `app.getVersion()` is exposed via IPC (`get-version`) and shown next to the title in the header
 - Version is driven by the `version` field in `package.json` — bump it before building
 
+### Theme ("Phosphor Terminal")
+- All colors live in `:root` in `renderer/styles.css` — reskin = swap that block only
+- Two alternate palettes (Cyber Magenta, Ion/Cold Steel) sit commented below `:root`
+- Near-black neutral bases, single phosphor-green accent, sharp radii (3px/2px)
+- `--on-accent` is the text color for anything sitting on `--accent` (bright accent = dark text)
+- State tinting uses `color-mix(in srgb, var(--x) N%, transparent)` — never hardcoded rgba, so palette swaps stay total
+- Mono font (`--font-mono`) on all machine data: paths, %, badges, buttons, labels, logs
+- Ambient bg on `body` = radial accent glow + 40px grid; `body::before` = 3px scanline overlay at 0.03 opacity
+- Queue item state is shown by a 2px colored left rail, not a card-wide tint
+- `.status-downloading .progress-fill` animates 45° stripes; `.indeterminate` (merging) pulses amber
+
 ### Self-promo link
 - "by Lance Petrisko" credit in the top-right of the header
 - Click opens https://lancepetrisko.com/ via `shell.openExternal` (IPC: `open-external`)
