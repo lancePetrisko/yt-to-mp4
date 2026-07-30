@@ -70,6 +70,11 @@ let progressCallback = null;
 
 let logsDir = path.join(__dirname, '..', 'logs');
 
+// Where downloads land when the user hasn't picked a folder. Electron passes the
+// real OS Downloads path in via startExpressServer; this is only the fallback for
+// running the server outside Electron.
+let defaultFolder = path.join(os.homedir(), 'Downloads');
+
 function generateId() {
   return crypto.randomBytes(6).toString('hex');
 }
@@ -107,7 +112,13 @@ function parsePercent(line) {
 function buildArgs(item, ffmpeg) {
   const { url, quality, format, outputFolder } = item;
   const platform = item.platform || detectPlatform(url);
-  const folder = outputFolder || os.homedir();
+  const folder = outputFolder || defaultFolder;
+  // yt-dlp won't create a missing destination root, so make sure it exists.
+  try {
+    if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+  } catch (_err) {
+    /* fall through — yt-dlp will report the write failure in the log */
+  }
   const outputTemplate = path.join(folder, '%(title)s.%(ext)s');
 
   const ffmpegArgs = ffmpeg ? ['--ffmpeg-location', ffmpeg] : [];
@@ -369,10 +380,13 @@ app.get('/logs/:id', (req, res) => {
   res.json({ id: req.params.id, logs: entry.logs });
 });
 
-function startExpressServer(onProgress, userDataPath) {
+function startExpressServer(onProgress, userDataPath, defaultDownloadDir) {
   progressCallback = onProgress;
   if (userDataPath) {
     logsDir = path.join(userDataPath, 'logs');
+  }
+  if (defaultDownloadDir) {
+    defaultFolder = defaultDownloadDir;
   }
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
   app.listen(3131, '127.0.0.1', () => {

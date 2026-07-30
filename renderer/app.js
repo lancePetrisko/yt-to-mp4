@@ -105,6 +105,14 @@ window.electronAPI.getVersion().then((v) => {
   document.getElementById('appVersion').textContent = v;
 });
 
+// Default to the OS Downloads folder until the user picks something else.
+window.electronAPI.getDefaultFolder().then((folder) => {
+  if (!folder || outputFolder) return;
+  outputFolder = folder;
+  folderPath.textContent = folder;
+  folderPath.title = folder;
+});
+
 document.querySelector('.header-credit').addEventListener('click', (e) => {
   e.preventDefault();
   window.electronAPI.openExternal('https://lancepetrisko.com/');

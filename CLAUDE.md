@@ -27,6 +27,16 @@ Electron + Express (port 3131) desktop app that wraps yt-dlp and ffmpeg to downl
 - `--postprocessor-args "ffmpeg:-c:a aac -q:a 0"` forces re-encoding to AAC during merge
 - This ensures the output MP4 plays in Windows Media Player / Movies & TV
 
+### Default download folder
+- Defaults to the OS Downloads folder, not the home folder
+- `app.getPath("downloads")` in `main.js` resolves it (respects a relocated/localised
+  Downloads dir), falling back to `~/Downloads`
+- Passed two ways: into `startExpressServer()` as the server-side fallback, and to the
+  renderer via IPC `get-default-folder` so the bottom bar shows the real path on launch
+- `server/downloader.js` keeps its own `~/Downloads` fallback for running the Express
+  server outside Electron
+- `buildArgs()` mkdir's the destination — yt-dlp won't create a missing root itself
+
 ### Output file path tracking
 - yt-dlp stdout is parsed for several patterns to capture the final output path:
   - `[download] Destination: <path>` — initial file write

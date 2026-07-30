@@ -23,8 +23,18 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 }
 
+// OS Downloads folder, honouring a relocated/localised one. Falls back to
+// ~/Downloads if Electron can't resolve it.
+function getDefaultDownloadDir() {
+  try {
+    return app.getPath("downloads");
+  } catch (_err) {
+    return path.join(app.getPath("home"), "Downloads");
+  }
+}
+
 app.whenReady().then(() => {
-  startExpressServer(sendProgress, app.getPath("userData"));
+  startExpressServer(sendProgress, app.getPath("userData"), getDefaultDownloadDir());
   createWindow();
 
   app.on("activate", () => {
@@ -46,6 +56,7 @@ function sendProgress(data) {
 ipcMain.handle("open-external", (_event, url) => shell.openExternal(url));
 ipcMain.handle("show-item-in-folder", (_event, filePath) => shell.showItemInFolder(filePath));
 ipcMain.handle("get-version", () => app.getVersion());
+ipcMain.handle("get-default-folder", () => getDefaultDownloadDir());
 ipcMain.handle("read-clipboard", () => clipboard.readText());
 
 ipcMain.handle("select-folder", async () => {
