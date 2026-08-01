@@ -4,6 +4,10 @@ A local desktop app for downloading YouTube, Twitch, and Kick videos as MP4 or M
 
 Developed and maintained by [Lance Petrisko](https://lancepetrisko.com).
 
+<p align="center">
+  <img src="screenshot-yt-downloader.png" alt="YTDown download queue with progress bars, quality selectors, and format toggles" width="800">
+</p>
+
 ## Features
 
 - Multi-platform — YouTube, Twitch VODs, and Kick
