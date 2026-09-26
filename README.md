@@ -36,6 +36,9 @@ Developed and maintained by [Lance Petrisko](https://lancepetrisko.com).
 **Linux:** no installer is built for Linux yet — run it from source instead. Unlike Windows/macOS, nothing is bundled, so yt-dlp and ffmpeg need to already be on `PATH`.
 
 ```bash
+# Node.js 18+ if you don't have it (or use nvm/your distro's package)
+# https://nodejs.org
+
 # Debian/Ubuntu
 sudo apt update && sudo apt install -y ffmpeg python3-pip git
 python3 -m pip install --user -U yt-dlp
@@ -46,9 +49,6 @@ python3 -m pip install --user -U yt-dlp
 
 # Arch
 sudo pacman -S --needed ffmpeg yt-dlp git
-
-# Node.js 18+ if you don't have it (or use nvm/your distro's package)
-# https://nodejs.org
 
 git clone https://github.com/lancePetrisko/yt-to-mp4.git
 cd yt-to-mp4
