@@ -5,3 +5,6 @@ just make it dead simple
 Make a Mac installer with all the same features as the
 windows installer
 
+
+More live updates as things download it seems like
+its not responsive
