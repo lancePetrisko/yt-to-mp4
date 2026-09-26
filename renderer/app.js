@@ -394,7 +394,10 @@ function renderQueueItem(id) {
         </div>
         <span class="progress-pct" id="pct-${id}">0%</span>
       </div>
-      <div class="status-label" id="lbl-${id}">Queued</div>
+      <div class="status-label-row">
+        <span class="block-spinner" id="spin-${id}"></span>
+        <div class="status-label" id="lbl-${id}">Queued</div>
+      </div>
     </div>
   `;
 
@@ -451,6 +454,9 @@ function updateItemUI(id) {
   const isRunning = item.status === 'downloading' || item.status === 'merging';
   const isDone    = item.status === 'done';
   const isFinal   = isDone || item.status === 'error' || item.status === 'cancelled';
+
+  const spinEl = document.getElementById(`spin-${id}`);
+  if (spinEl) spinEl.style.display = isRunning ? 'inline-block' : 'none';
 
   // Progress bar
   if (item.status === 'merging') {

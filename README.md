@@ -1,6 +1,6 @@
 # YTDown
 
-A local desktop app for downloading YouTube, Twitch, and Kick videos as MP4 or MP3. Built with Electron + Node.js. Runs on Windows and macOS.
+A local desktop app for downloading YouTube, Twitch, and Kick videos as MP4 or MP3. Built with Electron + Node.js. Installers for Windows and macOS; Linux runs from source.
 
 Developed and maintained by [Lance Petrisko](https://lancepetrisko.com).
 
@@ -32,6 +32,31 @@ Developed and maintained by [Lance Petrisko](https://lancepetrisko.com).
 **macOS:** download the `.dmg` for your Mac from [Releases](https://github.com/lancePetrisko/yt-to-mp4/releases) — `arm64` for Apple Silicon (M1 and newer), `x64` for Intel. Open it and drag the app to Applications.
 
 > **First launch on macOS:** the app isn't signed with an Apple Developer certificate, so macOS blocks it the first time. Right-click (or Control-click) the app → **Open** → **Open** in the dialog. Only needed once. Double-clicking normally just shows "damaged or can't be opened".
+
+**Linux:** no installer is built for Linux yet — run it from source instead. Unlike Windows/macOS, nothing is bundled, so yt-dlp and ffmpeg need to already be on `PATH`.
+
+```bash
+# Debian/Ubuntu
+sudo apt update && sudo apt install -y ffmpeg python3-pip git
+python3 -m pip install --user -U yt-dlp
+
+# Fedora
+sudo dnf install -y ffmpeg python3-pip git
+python3 -m pip install --user -U yt-dlp
+
+# Arch
+sudo pacman -S --needed ffmpeg yt-dlp git
+
+# Node.js 18+ if you don't have it (or use nvm/your distro's package)
+# https://nodejs.org
+
+git clone https://github.com/lancePetrisko/yt-to-mp4.git
+cd yt-to-mp4
+npm install
+npm start
+```
+
+> pip's `--user` install puts `yt-dlp` in `~/.local/bin`, which needs to be on `PATH` (add `export PATH="$HOME/.local/bin:$PATH"` to your shell rc if `yt-dlp --version` doesn't work in a fresh terminal). Electron itself needs the usual GTK/libnotify/nss libraries most desktops already have; on a minimal/headless distro install `libgtk-3-0 libnotify4 libnss3 libxss1 libasound2` (Debian/Ubuntu package names) first.
 
 ### If you already have yt-dlp/ffmpeg installed
 

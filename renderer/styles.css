@@ -477,6 +477,12 @@ body::before {
   text-align: right;
 }
 
+.status-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .status-label {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -485,6 +491,21 @@ body::before {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+/* Block spinner — square rotating in place while downloading/merging */
+@keyframes spin-square {
+  to { transform: rotate(360deg); }
+}
+
+.block-spinner {
+  display: none;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  animation: spin-square 0.9s linear infinite;
 }
 
 .status-label.done { color: var(--success); }
